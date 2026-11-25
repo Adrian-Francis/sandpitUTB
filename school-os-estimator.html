@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>School OS Estimator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: sticky section nav, form column on the left, sticky live estimate on the right.
+   Type: Inter, 14px body, scale 12/14/16/20/28. Spacing: 4px base, 8px rhythm. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --line: #e4e7ec;
+  --line-strong: #d0d5dd;
+  --text: #101828;
+  --text-2: #475467;
+  --text-3: #667085;
+  --accent: #1d4ed8;
+  --accent-soft: #eff4ff;
+  --accent-line: #b2ccff;
+  --ok-bg: #ecfdf3; --ok-fg: #05603a;
+  --warn-bg: #fffaeb; --warn-fg: #93370d;
+  --high-bg: #fff4ed; --high-fg: #b93815;
+  --crit-bg: #fef3f2; --crit-fg: #b42318;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --shadow: 0 1px 2px rgba(16,24,40,.05);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c111d; --surface: #141b2b; --surface-2: #101726;
+    --line: #232d42; --line-strong: #344057;
+    --text: #f2f4f7; --text-2: #c0c7d4; --text-3: #98a2b3;
+    --accent: #7aa2ff; --accent-soft: #16233f; --accent-line: #2f4a85;
+    --ok-bg: #0f2a1d; --ok-fg: #75e0a7;
+    --warn-bg: #2b2108; --warn-fg: #fec84b;
+    --high-bg: #2e1a0f; --high-fg: #fd9a6a;
+    --crit-bg: #2f1513; --crit-fg: #fda29b;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c111d; --surface: #141b2b; --surface-2: #101726;
+  --line: #232d42; --line-strong: #344057;
+  --text: #f2f4f7; --text-2: #c0c7d4; --text-3: #98a2b3;
+  --accent: #7aa2ff; --accent-soft: #16233f; --accent-line: #2f4a85;
+  --ok-bg: #0f2a1d; --ok-fg: #75e0a7;
+  --warn-bg: #2b2108; --warn-fg: #fec84b;
+  --high-bg: #2e1a0f; --high-fg: #fd9a6a;
+  --crit-bg: #2f1513; --crit-fg: #fda29b;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 400 14px/1.5 var(--font); -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+h1, h2, h3, p { margin: 0; text-wrap: balance; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* Top bar */
+.topbar {
+  position: sticky; top: 0; z-index: 20; background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-in {
+  max-width: 1320px; margin: 0 auto; padding: 0 24px; height: 56px;
+  display: flex; align-items: center; gap: 16px;
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; flex: none; }
+.logo svg { width: 16px; height: 16px; stroke: #fff; }
+.brand h1 { font-size: 16px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; }
+.tag { font-size: 12px; font-weight: 500; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.spacer { flex: 1; }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
+.seg button { border: 0; background: transparent; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; color: var(--text-2); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(16,24,40,.12); }
+.btn { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-weight: 500; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .btn.primary { color: #0c111d; }
+.btn.sm { height: 28px; padding: 0 10px; font-size: 13px; }
+.btn.link { border-color: transparent; background: transparent; color: var(--accent); padding: 0 8px; }
+
+.subnav { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 56px; z-index: 15; }
+.subnav-in { max-width: 1320px; margin: 0 auto; padding: 8px 24px; display: flex; gap: 4px; overflow-x: auto; }
+.subnav a { text-decoration: none; color: var(--text-2); font-weight: 500; padding: 6px 12px; border-radius: 8px; white-space: nowrap; }
+.subnav a:hover { background: var(--surface-2); color: var(--text); }
+.subnav a.on { background: var(--accent-soft); color: var(--accent); }
+
+/* Layout */
+.wrap { max-width: 1320px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr) 408px; gap: 24px; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); scroll-margin-top: 120px; }
+.card-h { padding: 20px 24px 0; display: flex; flex-direction: column; gap: 4px; }
+.card-h h2 { font-size: 16px; font-weight: 600; letter-spacing: -.005em; }
+.card-h p { color: var(--text-3); max-width: 70ch; }
+.card-b { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 20px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+.grid.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sub { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
+
+/* Fields */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > label, .lbl { font-size: 13px; font-weight: 500; color: var(--text); }
+.hint { font-size: 12px; color: var(--text-3); line-height: 1.4; }
+.inp, select.inp { height: 36px; width: 100%; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
+.inp:hover { border-color: var(--text-3); }
+.inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.inp.num { text-align: right; }
+.ad { position: relative; display: flex; }
+.ad .inp { padding-right: 44px; }
+.ad .u { position: absolute; right: 12px; top: 0; height: 36px; display: grid; place-items: center; color: var(--text-3); pointer-events: none; font-size: 13px; }
+.ad.pre .inp { padding-left: 26px; padding-right: 12px; }
+.ad.pre .u { right: auto; left: 12px; }
+
+.check { display: flex; gap: 12px; align-items: flex-start; }
+input[type="checkbox"] { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); flex: none; cursor: pointer; }
+
+/* Systems */
+.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.toolbar .meta { color: var(--text-2); font-weight: 500; }
+.group { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.group-h { background: var(--surface-2); padding: 8px 16px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.group-h span:last-child { color: var(--text-3); font-size: 12px; }
+.row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 124px 92px; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row.on { background: var(--accent-soft); }
+.row .nm { font-weight: 500; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.row .nt { grid-column: 2 / 3; color: var(--text-3); font-size: 12px; line-height: 1.45; margin-top: 2px; }
+.row .info { min-width: 0; }
+.chip { font-size: 11px; font-weight: 500; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--line-strong); color: var(--text-3); background: var(--surface); }
+select.tier { height: 30px; border-radius: 999px; border: 1px solid transparent; padding: 0 10px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; }
+select.tier.t0 { background: var(--ok-bg); color: var(--ok-fg); }
+select.tier.t1 { background: var(--warn-bg); color: var(--warn-fg); }
+select.tier.t2 { background: var(--high-bg); color: var(--high-fg); }
+select.tier.t3 { background: var(--crit-bg); color: var(--crit-fg); }
+.row .hrs .inp { height: 30px; font-size: 13px; }
+.row .hrs .u { height: 30px; }
+.row .name-inp { height: 30px; }
+.flag { grid-column: 2 / -1; font-size: 12px; color: var(--warn-fg); background: var(--warn-bg); border-radius: 6px; padding: 6px 10px; line-height: 1.4; }
+
+/* Risk */
+.risk-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.risk-val { font-size: 28px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+.risk-lbl { font-weight: 600; }
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 999px; outline-offset: 6px;
+  background: linear-gradient(90deg, #12b76a 0%, #fdb022 40%, #f79009 65%, #f04438 100%); cursor: pointer; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 2px solid var(--text); box-shadow: 0 1px 3px rgba(16,24,40,.3); }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--surface); border: 2px solid var(--text); }
+.ticks { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); margin-top: 8px; }
+.suggest { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+
+/* Assumptions */
+details.card > summary { list-style: none; cursor: pointer; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary h2 { font-size: 16px; font-weight: 600; }
+details.card > summary p { color: var(--text-3); margin-top: 4px; }
+details.card > summary .chev { transition: transform .15s; flex: none; }
+details.card[open] > summary .chev { transform: rotate(180deg); }
+details.card[open] > summary { border-bottom: 1px solid var(--line); }
+
+/* Summary */
+.summary { position: sticky; top: 124px; max-height: calc(100vh - 140px); overflow: auto; padding: 0; }
+.s-sec { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.s-sec:last-child { border-bottom: 0; }
+.s-title { font-size: 16px; font-weight: 600; }
+.s-meta { color: var(--text-3); font-size: 12px; }
+.price { font-size: 28px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+.price-card { border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+.price-card.main { border-color: var(--accent-line); background: var(--accent-soft); }
+.lab { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
+.range { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.bar { position: relative; height: 6px; background: var(--line); border-radius: 999px; }
+.bar i { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 999px; opacity: .35; }
+.bar b { position: absolute; top: -4px; width: 4px; height: 14px; background: var(--accent); border-radius: 2px; transform: translateX(-2px); }
+.bar-l { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); }
+table.t { width: 100%; border-collapse: collapse; }
+table.t td, table.t th { padding: 6px 0; text-align: right; font-weight: 400; }
+table.t td:first-child, table.t th:first-child { text-align: left; color: var(--text-2); }
+table.t th { font-size: 12px; font-weight: 600; color: var(--text-3); }
+table.t tr.tot td { font-weight: 600; color: var(--text); border-top: 1px solid var(--line); padding-top: 10px; }
+table.t tr.tot td:first-child { color: var(--text); }
+.watch { display: flex; flex-direction: column; gap: 8px; }
+.watch div { font-size: 12px; line-height: 1.45; background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px; padding: 8px 10px; }
+.watch div b { font-weight: 600; }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.toast { font-size: 12px; color: var(--ok-fg); min-height: 18px; }
+.empty { color: var(--text-3); font-size: 13px; }
+
+@media (max-width: 1080px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .summary { position: static; max-height: none; }
+  .topbar-in, .subnav-in { padding-left: 16px; padding-right: 16px; }
+  .grid.c3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.row .hrs .ad .inp { padding-right: 28px; }
+@media (max-width: 620px) {
+  .row { grid-template-columns: 24px minmax(0, 1fr) 92px; padding: 12px; gap: 8px 12px; }
+  .row .tierc { grid-column: 2 / 3; }
+  .row .hrs { grid-column: 3 / 4; grid-row: 1; }
+  .tag, .brand h1 { display: none; }
+  .topbar-in { gap: 8px; }
+  .seg button { padding: 4px 8px; font-size: 13px; white-space: nowrap; }
+  .grid.c3 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+@media print {
+  .topbar, .subnav, .form-col, .btnrow, .toast { display: none !important; }
+  .wrap { display: block; padding: 0; }
+  .summary { position: static; max-height: none; border: 0; box-shadow: none; }
+  body { background: #fff; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M7 12v4c0 1.5 2.2 3 5 3s5-1.5 5-3v-4"/></svg></div>
+      <h1>School OS Estimator</h1>
+      <span class="tag">Internal</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" role="group" aria-label="Market" id="marketSeg">
+      <button type="button" data-m="AU" aria-pressed="true">Australia</button>
+      <button type="button" data-m="NZ" aria-pressed="false">New Zealand</button>
+      <button type="button" data-m="Both" aria-pressed="false">Both</button>
+    </div>
+    <button type="button" class="btn" id="resetBtn">Reset</button>
+  </div>
+</header>
+
+<nav class="subnav" aria-label="Sections">
+  <div class="subnav-in" id="subnav">
+    <a href="#s-school" class="on">1 School</a>
+    <a href="#s-systems">2 Systems</a>
+    <a href="#s-scope">3 Data and scope</a>
+    <a href="#s-risk">4 Risk</a>
+    <a href="#s-commercial">5 Commercials</a>
+    <a href="#s-assump">6 Effort assumptions</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <div class="col form-col">
+
+    <section class="card" id="s-school">
+      <div class="card-h"><h2>School profile</h2><p>Size and sector set a multiplier on integration effort and decide the per-student licence.</p></div>
+      <div class="card-b">
+        <div class="grid">
+          <div class="field"><label for="f-school">School or group name</label><input id="f-school" class="inp" type="text" placeholder="e.g. Banksia College" data-bind="school"></div>
+          <div class="field"><label for="f-sector">Sector</label>
+            <select id="f-sector" class="inp" data-bind="sector"><option>Independent</option><option>Catholic</option><option>Government</option><option>Other</option></select>
+            <span class="hint">Government adds approval and security-assessment hours.</span></div>
+        </div>
+        <div class="grid">
+          <div class="field"><label for="f-students">Students</label><input id="f-students" class="inp num" type="number" min="0" step="10" data-bind="students"></div>
+          <div class="field"><label for="f-staff">Staff</label><input id="f-staff" class="inp num" type="number" min="0" step="5" data-bind="staff"></div>
+          <div class="field"><label for="f-campus">Campuses</label><input id="f-campus" class="inp num" type="number" min="1" step="1" data-bind="campuses"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="s-systems">
+      <div class="card-h"><h2>Current systems</h2><p>Tick every system the school runs. Each row shows the access risk and build hours, and both are editable. Systems marked Estimate were not confirmed against vendor documentation.</p></div>
+      <div class="card-b">
+        <div class="toolbar">
+          <span class="meta" id="sysMeta"></span><span class="spacer"></span>
+          <button type="button" class="btn sm" id="clearSys">Clear all</button>
+        </div>
+        <div id="sysList" style="display:flex;flex-direction:column;gap:16px"></div>
+        <div class="group" id="customGroup">
+          <div class="group-h"><span class="sub">Custom systems</span><span>Anything not listed above</span></div>
+          <div id="customList"></div>
+          <div style="padding:12px 16px"><button type="button" class="btn sm" id="addCustom">Add custom system</button></div>
+        </div>
+        <div class="sub">Other data sources</div>
+        <div class="grid">
+          <div class="field"><label for="f-dbs">Other databases</label><input id="f-dbs" class="inp num" type="number" min="0" step="1" data-bind="otherDbs"><span class="hint">SQL Server, Access, FileMaker or similar not listed above.</span></div>
+          <div class="field"><label for="f-flat">Spreadsheets and flat files</label><input id="f-flat" class="inp num" type="number" min="0" step="1" data-bind="flatFiles"><span class="hint">Regularly updated Excel or CSV sources.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="s-scope">
+      <div class="card-h"><h2>Data and scope</h2><p>Data quality multiplies integration effort and adds cleansing hours for each source.</p></div>
+      <div class="card-b">
+        <div class="grid">
+          <div class="field"><label for="f-dq">Data quality</label>
+            <select id="f-dq" class="inp" data-bind="dq" data-num>
+              <option value="0">Clean</option><option value="1">Moderate</option><option value="2">Dirty</option><option value="3">Very dirty</option>
+            </select>
+            <span class="hint" id="dqHint"></span></div>
+          <div class="field"><label for="f-dash">Dashboards</label><input id="f-dash" class="inp num" type="number" min="0" step="1" data-bind="dash"><span class="hint">Distinct executive or department views.</span></div>
+          <div class="field"><label for="f-refresh">Refresh frequency</label>
+            <select id="f-refresh" class="inp" data-bind="refresh" data-num>
+              <option value="0">Nightly batch</option><option value="1">Hourly</option><option value="2">Near real-time</option>
+            </select></div>
+        </div>
+        <div class="sub">Optional modules</div>
+        <div id="modList" style="display:flex;flex-direction:column;gap:12px"></div>
+      </div>
+    </section>
+
+    <section class="card" id="s-risk">
+      <div class="card-h"><h2>Delivery risk</h2><p>Sets the contingency added to the hours. The range on the right widens as risk rises.</p></div>
+      <div class="card-b">
+        <div class="risk-top">
+          <div><div class="risk-val" id="riskVal">40</div><div class="risk-lbl" id="riskLbl"></div></div>
+          <div style="text-align:right"><div class="lab">Contingency</div><div style="font-size:20px;font-weight:600" id="riskCont"></div></div>
+        </div>
+        <div>
+          <input type="range" id="f-risk" min="0" max="100" step="5" aria-label="Delivery risk" data-bind="risk" data-num>
+          <div class="ticks"><span>Low</span><span>Moderate</span><span>High</span><span>Severe</span></div>
+        </div>
+        <div class="suggest"><span id="suggestTxt" style="flex:1;min-width:200px"></span><button type="button" class="btn sm" id="applySuggest">Use suggested</button></div>
+      </div>
+    </section>
+
+    <section class="card" id="s-commercial">
+      <div class="card-h"><h2>Commercials</h2><p>Margin is a percentage of the selling price, so price = cost ÷ (1 − margin).</p></div>
+      <div class="card-b">
+        <div class="grid">
+          <div class="field"><label for="f-rate">Daily rate (your cost)</label><div class="ad pre"><span class="u">$</span><input id="f-rate" class="inp num" type="number" min="0" step="50" data-bind="rate"></div><span class="hint">Loaded cost per delivery day.</span></div>
+          <div class="field"><label for="f-margin">Build margin</label><div class="ad"><input id="f-margin" class="inp num" type="number" min="0" max="90" step="1" data-bind="margin"><span class="u">%</span></div></div>
+          <div class="field"><label for="f-lmargin">Licence margin</label><div class="ad"><input id="f-lmargin" class="inp num" type="number" min="0" max="90" step="1" data-bind="licMargin"><span class="u">%</span></div></div>
+        </div>
+        <div class="grid">
+          <div class="field"><label for="f-3o">Third-party costs, one-off</label><div class="ad pre"><span class="u">$</span><input id="f-3o" class="inp num" type="number" min="0" step="100" data-bind="thirdOnce"></div><span class="hint">Vendor API enablement, accreditation or assessments.</span></div>
+          <div class="field"><label for="f-3a">Third-party costs, annual</label><div class="ad pre"><span class="u">$</span><input id="f-3a" class="inp num" type="number" min="0" step="100" data-bind="thirdAnnual"></div><span class="hint">Pass-through API or data-broker fees.</span></div>
+          <div class="field"><label for="f-disc">Build discount</label><div class="ad"><input id="f-disc" class="inp num" type="number" min="0" max="50" step="1" data-bind="discount"><span class="u">%</span></div></div>
+          <div class="field"><label for="f-gst">GST</label><div class="ad"><input id="f-gst" class="inp num" type="number" min="0" max="25" step="0.5" data-bind="gst"><span class="u">%</span></div><span class="hint">10% in Australia, 15% in New Zealand.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <details class="card" id="s-assump">
+      <summary>
+        <div><h2>Effort assumptions</h2><p>Every hour and rate the calculator uses. Change them to match how you deliver.</p></div>
+        <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="card-b" id="assumpBody"></div>
+    </details>
+
+  </div>
+
+  <aside class="card summary" id="summary" aria-live="polite"></aside>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Catalogue ---------- */
+  var TIERS = ["Low", "Moderate", "High", "Very high"];
+  var G_SIS = "Student information and management";
+  var G_LMS = "Learning management and classroom";
+  var G_FIN = "Finance, HR and payroll";
+  var G_DAT = "Timetabling and assessment data";
+  var G_OTH = "Wellbeing, admissions and other";
+  var GROUPS = [G_SIS, G_LMS, G_FIN, G_DAT, G_OTH];
+
+  // t = access risk index, h = default hours, v = 1 when confirmed in vendor documentation during research
+  var SYSTEMS = [
+    { id: "synergetic", g: G_SIS, n: "Synergetic (Tes)", m: ["AU", "NZ"], t: 1, h: 40, v: 1, a: "REST API (65+ endpoints), SOAP web services, SynAPI, direct SQL", note: "Newer REST endpoints need a recent version. Older sites often fall back to SOAP or read-only SQL." },
+    { id: "compass", g: G_SIS, n: "Compass", m: ["AU"], t: 2, h: 72, v: 1, a: "Enterprise API, partner-gated", note: "Large, frequent data pulls are not typically permitted. Plan for scheduled extracts.", flag: "Third-party integrators go through an accreditation process that can take 3 to 6 months. Start the application at contract signing." },
+    { id: "sentral", g: G_SIS, n: "Sentral", m: ["AU"], t: 2, h: 56, v: 1, a: "API on Enterprise tier only, admin-issued key", note: "API creation is only offered to Sentral administrators.", flag: "API access exists only on the Sentral Enterprise version. Confirm the school's tier before quoting." },
+    { id: "seqta", g: G_SIS, n: "SEQTA (Tes)", m: ["AU"], t: 2, h: 56, v: 1, a: "Engage API Centre, credentials per school", note: "Third-party integrators report read-only access." },
+    { id: "govau", g: G_SIS, n: "State or territory department system", m: ["AU"], t: 3, h: 110, v: 1, a: "CASES21 (Vic), OneSchool (Qld), EDSAS (SA), NSW DoE, WA RTP and AoS", note: "Department-controlled. Access is usually approved centrally, not by the school.", flag: "Government school data sits under department policy. NSW uses SIF-based third-party integration, and Victoria extracts its own reporting data. Budget for approvals and possible refusal." },
+    { id: "nicheau", g: G_SIS, n: "Other AU school systems", m: ["AU"], t: 2, h: 80, v: 0, a: "Civica Maze, Zunia, SchoolPro, Xuno, Accelerus", note: "No public API details found. Treat as high risk until the vendor confirms." },
+    { id: "kamar", g: G_SIS, n: "KAMAR", m: ["NZ"], t: 1, h: 48, v: 1, a: "Push-based Directory Services (JSON or XML)", note: "The school points KAMAR at your endpoint, so there is no ad-hoc pull and backfill is harder. The vendor has historically avoided custom per-vendor feeds." },
+    { id: "edge", g: G_SIS, n: "Edge (formerly MUSAC Edge)", m: ["NZ"], t: 2, h: 56, v: 1, a: "Vendor-managed sync; public developer docs not found", note: "Third parties connect through vendor-configured syncs." },
+    { id: "etap", g: G_SIS, n: "eTAP", m: ["NZ"], t: 2, h: 64, v: 0, a: "Limited public integration information", note: "Confirm access method with the vendor." },
+    { id: "hero", g: G_SIS, n: "Hero or FACTS", m: ["NZ"], t: 2, h: 64, v: 0, a: "Limited public integration information", note: "Confirm access method with the vendor." },
+    { id: "terito", g: G_SIS, n: "Te Rito (NZ Ministry of Education)", m: ["NZ"], t: 1, h: 40, v: 1, a: "Ministry API site with sandbox", note: "National platform aimed at SMS and edtech providers. Check eligibility and the consent model." },
+
+    { id: "canvas", g: G_LMS, n: "Canvas", m: ["AU", "NZ"], t: 1, h: 40, v: 1, a: "REST API and Canvas Data 2", note: "Rate limits apply per token and return HTTP 429. Use sequential, sorted bulk pulls." },
+    { id: "moodle", g: G_LMS, n: "Moodle", m: ["AU", "NZ"], t: 0, h: 36, v: 0, a: "Web services, hosting varies", note: "Self-hosted versions vary in version, plugins and access." },
+    { id: "schoology", g: G_LMS, n: "Schoology", m: ["AU", "NZ"], t: 1, h: 40, v: 1, a: "REST API, admin-issued keys", note: "Plan around rate limits and permission scopes." },
+    { id: "schoolbox", g: G_LMS, n: "Schoolbox", m: ["AU", "NZ"], t: 1, h: 40, v: 1, a: "Documented REST API", note: "API docs are public. Its own link to the SIS is often a direct SQL connection." },
+    { id: "gclass", g: G_LMS, n: "Google Workspace and Classroom", m: ["AU", "NZ"], t: 0, h: 32, v: 1, a: "Classroom API, OAuth and admin consent", note: "Domain admin controls what data is shared." },
+    { id: "m365", g: G_LMS, n: "Microsoft 365, Teams and School Data Sync", m: ["AU", "NZ"], t: 0, h: 32, v: 1, a: "Microsoft Graph Education APIs", note: "Tenant admin consent is required once." },
+
+    { id: "xero", g: G_FIN, n: "Xero", m: ["AU", "NZ"], t: 0, h: 32, v: 0, a: "Cloud API", note: "" },
+    { id: "myob", g: G_FIN, n: "MYOB or MYOB Acumatica", m: ["AU", "NZ"], t: 1, h: 40, v: 0, a: "Cloud API", note: "" },
+    { id: "t1", g: G_FIN, n: "TechnologyOne", m: ["AU", "NZ"], t: 2, h: 64, v: 0, a: "Enterprise, usually vendor or IT led", note: "Expect vendor involvement to open access." },
+    { id: "intacct", g: G_FIN, n: "Sage Intacct", m: ["AU", "NZ"], t: 1, h: 40, v: 0, a: "Cloud API", note: "" },
+    { id: "hr", g: G_FIN, n: "HR or payroll platform", m: ["AU", "NZ"], t: 1, h: 40, v: 0, a: "Varies by vendor", note: "Staff data is sensitive. Agree scope with the school's privacy lead." },
+
+    { id: "tt", g: G_DAT, n: "Timetabling (Edval, Tes Timetable)", m: ["AU", "NZ"], t: 1, h: 28, v: 1, a: "CSV or flat-file sync", note: "File-based, so freshness depends on how often the school exports." },
+    { id: "naplan", g: G_DAT, n: "External assessment (NAPLAN, PAT, ACER)", m: ["AU"], t: 0, h: 24, v: 0, a: "File upload or portal export", note: "Formats change year to year." },
+    { id: "ncea", g: G_DAT, n: "NCEA and NZQA results", m: ["NZ"], t: 0, h: 24, v: 0, a: "File export", note: "" },
+
+    { id: "wellbeing", g: G_OTH, n: "Wellbeing or pastoral platform", m: ["AU", "NZ"], t: 1, h: 32, v: 0, a: "Varies by vendor", note: "Highly sensitive data. Confirm consent and storage rules." },
+    { id: "crm", g: G_OTH, n: "Admissions or enrolment CRM", m: ["AU", "NZ"], t: 1, h: 32, v: 1, a: "Funnel, Enquiry Tracker, EnrolHQ and similar", note: "Many already sync with the SIS, so you may read from the SIS instead." },
+    { id: "payments", g: G_OTH, n: "Parent payments and forms", m: ["AU", "NZ"], t: 1, h: 28, v: 0, a: "Varies by vendor", note: "" },
+    { id: "identity", g: G_OTH, n: "Identity or directory (Entra ID, Google)", m: ["AU", "NZ"], t: 0, h: 20, v: 0, a: "Standard directory APIs", note: "Useful as the master key for matching people across systems." }
+  ];
+
+  var MODS = [
+    { k: "sso", n: "Single sign-on and role-based access", d: "Google or Microsoft sign-in, staff roles and permissions" },
+    { k: "sec", n: "Privacy and security assessment", d: "Privacy impact assessment, ST4S-style evidence, data-residency review" },
+    { k: "hist", n: "Historical data backfill", d: "Load previous years so trends work from day one", yrs: true },
+    { k: "alerts", n: "Alerts and notifications", d: "Attendance, wellbeing and finance thresholds sent to leaders" },
+    { k: "ai", n: "AI summaries layer", d: "Plain-language summaries and question answering over the data" },
+    { k: "train", n: "Staff training and handover", d: "Leadership sessions, admin guide and runbook" },
+    { k: "packs", n: "Board and parent report packs", d: "Scheduled PDF or slide exports" }
+  ];
+
+  var DQ_HINT = [
+    "Shared student IDs, few duplicates, consistent year levels.",
+    "Some duplicates and inconsistent year levels or dates.",
+    "Frequent duplicates, free-text values, more than one ID per student.",
+    "Spreadsheet-driven, no common student ID across systems."
+  ];
+
+  /* ---------- State ---------- */
+  function defaults() {
+    var sys = {};
+    SYSTEMS.forEach(function (s) { sys[s.id] = { on: false, h: s.h, t: s.t }; });
+    var mods = { sso: true, sec: true, hist: false, alerts: false, ai: false, train: true, packs: false };
+    return {
+      school: "", market: "AU", sector: "Independent", students: 1200, staff: 150, campuses: 1,
+      otherDbs: 0, flatFiles: 2, dq: 1, dash: 4, refresh: 0, risk: 40,
+      mods: mods, histYears: 3, sys: sys, custom: [],
+      rate: 1100, margin: 35, licMargin: 50, thirdOnce: 0, thirdAnnual: 0, discount: 0, gst: 10,
+      cfg: {
+        hoursPerDay: 7.6, foundation: 80, discovery: 24, pmPct: 12, qaPct: 10,
+        perDb: 24, perFlat: 12, perDash: 16, perCampus: 12, perYear: 6,
+        sizeTh: [500, 1500, 3000], size: [1, 1.1, 1.2, 1.35],
+        dqMult: [1, 1.2, 1.45, 1.8], dqClean: [0, 4, 10, 18],
+        refresh: [0, 24, 80],
+        sector: { Independent: 0, Catholic: 16, Government: 24, Other: 0 },
+        modH: { sso: 16, sec: 24, hist: 0, alerts: 24, ai: 60, train: 16, packs: 24 },
+        maxCont: 50, lowF: 0.4, highF: 1.6, unc: 10,
+        licHosting: 3600, licPerStudent: 4, licPerOther: 300, licRiskShare: 50,
+        tierMaint: [600, 1200, 2400, 3600]
+      }
+    };
+  }
+  var STORE = "utb-school-os-estimator-v1";
+  var state = defaults();
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (saved) state = merge(defaults(), saved);
+  } catch (e) { /* storage unavailable */ }
+
+  function merge(a, b) {
+    if (Array.isArray(b)) return b.slice();
+    if (b && typeof b === "object" && a && typeof a === "object" && !Array.isArray(a)) {
+      Object.keys(b).forEach(function (k) { a[k] = (k in a) ? merge(a[k], b[k]) : b[k]; });
+      return a;
+    }
+    return b;
+  }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* ignore */ } }
+
+  /* ---------- Helpers ---------- */
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function getPath(o, p) { return p.split(".").reduce(function (a, k) { return a == null ? a : a[k]; }, o); }
+  function setPath(o, p, v) { var ks = p.split("."); var last = ks.pop(); var t = ks.reduce(function (a, k) { return a[k]; }, o); t[last] = v; }
+  function money(n) {
+    var cur = state.market === "NZ" ? "NZD" : "AUD";
+    return new Intl.NumberFormat("en-AU", { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(n || 0);
+  }
+  function hrs(n) { return Math.round(n).toLocaleString("en-AU"); }
+  function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+
+  /* ---------- Rendering of form pieces ---------- */
+  function visibleSystems() {
+    var out = [];
+    SYSTEMS.forEach(function (s) {
+      var show = state.market === "Both" || s.m.indexOf(state.market) > -1;
+      if (!show) return;
+      var st = state.sys[s.id];
+      out.push({ id: s.id, def: s, on: st.on, h: num(st.h), t: st.t, n: s.n, flag: s.flag, g: s.g });
+    });
+    state.custom.forEach(function (c, i) {
+      out.push({ id: "c" + i, def: null, on: c.on, h: num(c.h), t: c.t, n: c.n || "Custom system", g: "Custom" });
+    });
+    return out;
+  }
+
+  function tierSelect(path, val) {
+    return '<select class="tier t' + val + '" data-bind="' + path + '" data-num data-tier aria-label="Access risk">' +
+      TIERS.map(function (t, i) { return '<option value="' + i + '"' + (i === val ? " selected" : "") + ">" + t + " risk</option>"; }).join("") + "</select>";
+  }
+
+  function renderSystems() {
+    var html = "";
+    GROUPS.forEach(function (g) {
+      var items = SYSTEMS.filter(function (s) { return s.g === g && (state.market === "Both" || s.m.indexOf(state.market) > -1); });
+      if (!items.length) return;
+      html += '<div class="group"><div class="group-h"><span class="sub">' + esc(g) + "</span><span>" + items.length + " systems</span></div>";
+      items.forEach(function (s) {
+        var p = "sys." + s.id;
+        var on = state.sys[s.id].on;
+        var mk = state.market === "Both" ? s.m.join(" / ") : "";
+        html += '<div class="row' + (on ? " on" : "") + '" data-row="' + s.id + '">' +
+          '<input type="checkbox" id="chk-' + s.id + '" data-bind="' + p + '.on" aria-label="Include ' + esc(s.n) + '"' + (on ? " checked" : "") + ">" +
+          '<div class="info"><label class="nm" for="chk-' + s.id + '">' + esc(s.n) +
+          (mk ? '<span class="chip">' + mk + "</span>" : "") +
+          (s.v ? "" : '<span class="chip" title="Not confirmed against vendor documentation. Verify before quoting.">Estimate</span>') +
+          '</label><div class="nt">' + esc(s.a) + (s.note ? ". " + esc(s.note) : "") + "</div></div>" +
+          '<div class="tierc">' + tierSelect(p + ".t", state.sys[s.id].t) + "</div>" +
+          '<div class="hrs"><div class="ad"><input class="inp num" type="number" min="0" step="2" aria-label="Hours for ' + esc(s.n) + '" data-bind="' + p + '.h"><span class="u">h</span></div></div>' +
+          (s.flag ? '<div class="flag">' + esc(s.flag) + "</div>" : "") +
+          "</div>";
+      });
+      html += "</div>";
+    });
+    $("#sysList").innerHTML = html;
+    bindAll($("#sysList"));
+  }
+
+  function renderCustom() {
+    var html = "";
+    state.custom.forEach(function (c, i) {
+      var p = "custom." + i;
+      html += '<div class="row' + (c.on ? " on" : "") + '">' +
+        '<input type="checkbox" data-bind="' + p + '.on" aria-label="Include custom system"' + (c.on ? " checked" : "") + ">" +
+        '<div class="info"><input class="inp name-inp" type="text" placeholder="System name" aria-label="Custom system name" data-bind="' + p + '.n"></div>' +
+        '<div class="tierc">' + tierSelect(p + ".t", c.t) + "</div>" +
+        '<div class="hrs"><div class="ad"><input class="inp num" type="number" min="0" step="2" aria-label="Hours" data-bind="' + p + '.h"><span class="u">h</span></div></div>' +
+        '<div class="nt" style="grid-column:2/-1"><button type="button" class="btn link sm" data-rm="' + i + '">Remove</button></div></div>';
+    });
+    $("#customList").innerHTML = html || '<div class="row"><span></span><span class="empty">No custom systems added.</span></div>';
+    bindAll($("#customList"));
+    $$("[data-rm]").forEach(function (b) {
+      b.addEventListener("click", function () { state.custom.splice(+b.getAttribute("data-rm"), 1); renderCustom(); update(); });
+    });
+  }
+
+  function renderMods() {
+    $("#modList").innerHTML = MODS.map(function (m) {
+      var hoursField = m.yrs
+        ? '<div class="ad" style="width:132px"><input class="inp num" type="number" min="0" max="15" step="1" aria-label="Years of history" data-bind="histYears"><span class="u">years</span></div>'
+        : '<div class="ad" style="width:132px"><input class="inp num" type="number" min="0" step="2" aria-label="Hours for ' + esc(m.n) + '" data-bind="cfg.modH.' + m.k + '"><span class="u">h</span></div>';
+      return '<div class="check"><input type="checkbox" id="mod-' + m.k + '" data-bind="mods.' + m.k + '"' + (state.mods[m.k] ? " checked" : "") + ">" +
+        '<label for="mod-' + m.k + '" style="flex:1"><span class="lbl">' + esc(m.n) + '</span><br><span class="hint">' + esc(m.d) + (m.yrs ? " Each year adds " + state.cfg.perYear + " hours." : "") + "</span></label>" + hoursField + "</div>";
+    }).join("");
+    bindAll($("#modList"));
+  }
+
+  function numField(label, path, unit, step, hint) {
+    return '<div class="field"><label for="a-' + path + '">' + label + '</label><div class="ad"><input id="a-' + path + '" class="inp num" type="number" min="0" step="' + (step || 1) + '" data-bind="' + path + '">' + (unit ? '<span class="u">' + unit + "</span>" : "") + "</div>" + (hint ? '<span class="hint">' + hint + "</span>" : "") + "</div>";
+  }
+  function renderAssump() {
+    var h = "";
+    h += '<div class="sub">Fixed effort</div><div class="grid">' +
+      numField("Foundation build", "cfg.foundation", "h", 4, "Data model, hosting, auth shell.") +
+      numField("Discovery and mapping", "cfg.discovery", "h", 4) +
+      numField("Project management", "cfg.pmPct", "%", 1, "Of build hours.") +
+      numField("Testing and UAT", "cfg.qaPct", "%", 1, "Of build hours.") +
+      numField("Hours per delivery day", "cfg.hoursPerDay", "h", 0.1) + "</div>";
+    h += '<div class="sub">Scope unit effort</div><div class="grid">' +
+      numField("Per other database", "cfg.perDb", "h", 2) +
+      numField("Per spreadsheet or flat file", "cfg.perFlat", "h", 2) +
+      numField("Per dashboard", "cfg.perDash", "h", 2) +
+      numField("Per extra campus", "cfg.perCampus", "h", 2) +
+      numField("Per year of history", "cfg.perYear", "h", 1) + "</div>";
+    h += '<div class="sub">Refresh frequency add-on</div><div class="grid c3">' +
+      numField("Nightly", "cfg.refresh.0", "h", 4) + numField("Hourly", "cfg.refresh.1", "h", 4) + numField("Near real-time", "cfg.refresh.2", "h", 4) + "</div>";
+    h += '<div class="sub">Sector add-on hours</div><div class="grid">' +
+      numField("Independent", "cfg.sector.Independent", "h", 2) + numField("Catholic", "cfg.sector.Catholic", "h", 2) +
+      numField("Government", "cfg.sector.Government", "h", 2) + numField("Other", "cfg.sector.Other", "h", 2) + "</div>";
+    h += '<div class="sub">Size multiplier on integration hours (students plus staff)</div><div class="grid">' +
+      numField("Under this headcount", "cfg.sizeTh.0", "", 50) + numField("Under this headcount", "cfg.sizeTh.1", "", 50) + numField("Under this headcount", "cfg.sizeTh.2", "", 50) + "</div>" +
+      '<div class="grid">' +
+      numField("Multiplier, smallest", "cfg.size.0", "×", 0.05) + numField("Multiplier, next", "cfg.size.1", "×", 0.05) +
+      numField("Multiplier, next", "cfg.size.2", "×", 0.05) + numField("Multiplier, largest", "cfg.size.3", "×", 0.05) + "</div>";
+    h += '<div class="sub">Data quality (clean, moderate, dirty, very dirty)</div><div class="grid">' +
+      numField("Integration multiplier, clean", "cfg.dqMult.0", "×", 0.05) + numField("Moderate", "cfg.dqMult.1", "×", 0.05) +
+      numField("Dirty", "cfg.dqMult.2", "×", 0.05) + numField("Very dirty", "cfg.dqMult.3", "×", 0.05) + "</div>" +
+      '<div class="grid">' +
+      numField("Cleansing per source, clean", "cfg.dqClean.0", "h", 1) + numField("Moderate", "cfg.dqClean.1", "h", 1) +
+      numField("Dirty", "cfg.dqClean.2", "h", 1) + numField("Very dirty", "cfg.dqClean.3", "h", 1) + "</div>";
+    h += '<div class="sub">Risk and range</div><div class="grid">' +
+      numField("Contingency at risk 100", "cfg.maxCont", "%", 5, "Risk slider scales up to this.") +
+      numField("Low case uses", "cfg.lowF", "× contingency", 0.1) +
+      numField("High case uses", "cfg.highF", "× contingency", 0.1) +
+      numField("Base uncertainty either way", "cfg.unc", "%", 1, "Range floor, even at zero risk.") + "</div>";
+    h += '<div class="sub">Annual licence</div><div class="grid">' +
+      numField("Hosting and platform", "cfg.licHosting", "$", 100) +
+      numField("Per student", "cfg.licPerStudent", "$", 0.5) +
+      numField("Per other source", "cfg.licPerOther", "$", 50) +
+      numField("Risk uplift share", "cfg.licRiskShare", "%", 5, "Share of contingency applied to licence.") + "</div>" +
+      '<div class="grid">' +
+      numField("Integration upkeep, low risk", "cfg.tierMaint.0", "$", 100) + numField("Moderate", "cfg.tierMaint.1", "$", 100) +
+      numField("High", "cfg.tierMaint.2", "$", 100) + numField("Very high", "cfg.tierMaint.3", "$", 100) + "</div>";
+    $("#assumpBody").innerHTML = h;
+    bindAll($("#assumpBody"));
+  }
+
+  /* ---------- Binding ---------- */
+  function bindAll(root) {
+    $$("[data-bind]", root).forEach(function (el) {
+      var path = el.getAttribute("data-bind");
+      var v = getPath(state, path);
+      if (el.type === "checkbox") el.checked = !!v;
+      else el.value = (v === undefined || v === null) ? "" : v;
+      el.addEventListener("input", function () { onInput(el, path); });
+      el.addEventListener("change", function () { onInput(el, path); });
+    });
+  }
+  function onInput(el, path) {
+    var v;
+    if (el.type === "checkbox") v = el.checked;
+    else if (el.type === "number" || el.hasAttribute("data-num")) v = num(el.value);
+    else v = el.value;
+    setPath(state, path, v);
+    var row = el.closest(".row");
+    if (row && el.type === "checkbox") row.classList.toggle("on", el.checked);
+    update();
+  }
+
+  /* ---------- Calculation ---------- */
+  function calc() {
+    var s = state, c = s.cfg;
+    var vis = visibleSystems();
+    var sel = vis.filter(function (x) { return x.on; });
+    var intRaw = sel.reduce(function (a, x) { return a + x.h; }, 0);
+    var head = num(s.students) + num(s.staff);
+    var sizeMult = head < c.sizeTh[0] ? c.size[0] : head < c.sizeTh[1] ? c.size[1] : head < c.sizeTh[2] ? c.size[2] : c.size[3];
+    var dqM = c.dqMult[s.dq], dqC = c.dqClean[s.dq];
+    var integ = intRaw * sizeMult * dqM;
+    var otherH = (num(s.otherDbs) * c.perDb + num(s.flatFiles) * c.perFlat) * dqM;
+    var nSources = sel.length + num(s.otherDbs) + num(s.flatFiles);
+    var cleanH = nSources * dqC;
+    var dashH = num(s.dash) * c.perDash + c.refresh[s.refresh];
+    var scaleH = Math.max(0, num(s.campuses) - 1) * c.perCampus + (c.sector[s.sector] || 0);
+    var modH = 0;
+    MODS.forEach(function (m) { if (s.mods[m.k]) modH += m.yrs ? num(s.histYears) * c.perYear : num(c.modH[m.k]); });
+    var found = c.foundation + c.discovery;
+    var sub = found + integ + otherH + cleanH + dashH + scaleH + modH;
+    var pm = sub * c.pmPct / 100, qa = sub * c.qaPct / 100;
+    var base = sub + pm + qa;
+    var cont = s.risk / 100 * c.maxCont / 100;
+    var costRate = s.rate / (c.hoursPerDay || 7.6);
+    var m = Math.min(num(s.margin), 95) / 100, lm = Math.min(num(s.licMargin), 95) / 100;
+
+    var maint = sel.reduce(function (a, x) { return a + c.tierMaint[x.t]; }, 0);
+    var licVar = c.licHosting + num(s.students) * c.licPerStudent + maint + (num(s.otherDbs) + num(s.flatFiles)) * c.licPerOther;
+
+    function scn(k) {
+      var f = k === "low" ? c.lowF : k === "high" ? c.highF : 1;
+      var u = k === "low" ? 1 - c.unc / 100 : k === "high" ? 1 + c.unc / 100 : 1;
+      var hours = base * (1 + cont * f) * u;
+      var labour = hours * costRate;
+      var cost = labour + num(s.thirdOnce);
+      var price = cost / (1 - m);
+      var discAmt = price * num(s.discount) / 100;
+      var net = price - discAmt;
+      var gst = net * num(s.gst) / 100;
+      var lic = licVar * (1 + cont * c.licRiskShare / 100 * f) + num(s.thirdAnnual);
+      var licPrice = lic / (1 - lm);
+      var licGst = licPrice * num(s.gst) / 100;
+      return { hours: hours, labour: labour, cost: cost, price: price, discAmt: discAmt, net: net, gst: gst, inc: net + gst, lic: lic, licPrice: licPrice, licInc: licPrice + licGst };
+    }
+    var lo = scn("low"), ex = scn("exp"), hi = scn("high");
+
+    // Suggested risk
+    var avgTier = sel.length ? sel.reduce(function (a, x) { return a + x.t; }, 0) / sel.length : 0;
+    var hasFlag = sel.some(function (x) { return !!x.flag; });
+    var isGov = s.sector === "Government" || sel.some(function (x) { return x.id === "govau"; });
+    var sugg = Math.round((10 + (avgTier / 3) * 35 + (s.dq / 3) * 25 + Math.min(sel.length, 12) / 12 * 15 + (isGov ? 10 : 0) + (hasFlag ? 5 : 0)) / 5) * 5;
+    sugg = Math.max(0, Math.min(100, sugg));
+
+    return { vis: vis, sel: sel, sizeMult: sizeMult, dqM: dqM, found: found, integ: integ, intRaw: intRaw, otherH: otherH, cleanH: cleanH, dashH: dashH, scaleH: scaleH, modH: modH,
+      pm: pm, qa: qa, base: base, cont: cont, contH: base * cont, costRate: costRate, lo: lo, ex: ex, hi: hi, sugg: sugg, licVar: licVar, maint: maint, m: m, lm: lm, nSources: nSources };
+  }
+
+  function riskLabel(r) { return r < 25 ? "Low" : r < 50 ? "Moderate" : r < 75 ? "High" : "Severe"; }
+
+  /* ---------- Summary ---------- */
+  var lastText = "";
+  function update() {
+    var r = calc();
+    var s = state, c = s.cfg;
+
+    // form-side readouts
+    $("#riskVal").textContent = s.risk;
+    $("#riskLbl").textContent = riskLabel(s.risk) + " risk";
+    $("#riskCont").textContent = "+" + (r.cont * 100).toFixed(0) + "% hours";
+    $("#suggestTxt").innerHTML = "Suggested from your selections: <b>" + r.sugg + " (" + riskLabel(r.sugg) + ")</b>. Based on average access risk, data quality, number of sources and sector.";
+    $("#applySuggest").disabled = (r.sugg === s.risk);
+    $("#dqHint").textContent = DQ_HINT[s.dq];
+    $("#sysMeta").textContent = r.sel.length + " selected, " + hrs(r.intRaw) + " base hours";
+    $$("[data-tier]").forEach(function (el) { el.className = "tier t" + el.value; });
+    $$("#marketSeg button").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-m") === s.market ? "true" : "false"); });
+
+    var name = s.school.trim() || "Untitled school";
+    var lines = [];
+    var watch = r.sel.filter(function (x) { return x.flag; }).map(function (x) { return "<div><b>" + esc(x.n) + ".</b> " + esc(x.flag) + "</div>"; });
+    if (s.dq >= 2) watch.push("<div><b>Data quality.</b> Run a short data-profiling spike before committing to a fixed price. Duplicate and missing IDs drive most overruns.</div>");
+    if (s.risk >= 75) watch.push("<div><b>Severe risk.</b> Consider a paid discovery phase first, with integrations quoted on time and materials.</div>");
+
+    var rows = [
+      ["Foundation and discovery", r.found],
+      ["Integrations (" + r.sel.length + " systems" + (r.sizeMult !== 1 || r.dqM !== 1 ? ", ×" + (r.sizeMult * r.dqM).toFixed(2) : "") + ")", r.integ],
+      ["Other databases and files", r.otherH],
+      ["Data cleansing", r.cleanH],
+      ["Dashboards and refresh", r.dashH],
+      ["Campuses and sector", r.scaleH],
+      ["Optional modules", r.modH],
+      ["Project management", r.pm],
+      ["Testing and UAT", r.qa],
+      ["Risk contingency", r.contH]
+    ];
+    var hoursRows = rows.map(function (x) { return "<tr><td>" + x[0] + "</td><td>" + hrs(x[1]) + " h</td></tr>"; }).join("");
+
+    var span = r.hi.net - r.lo.net;
+    var pos = span > 0 ? Math.max(0, Math.min(100, (r.ex.net - r.lo.net) / span * 100)) : 50;
+    var lspan = r.hi.licPrice - r.lo.licPrice;
+    var lpos = lspan > 0 ? Math.max(0, Math.min(100, (r.ex.licPrice - r.lo.licPrice) / lspan * 100)) : 50;
+    var threeYr = r.ex.net + 3 * r.ex.licPrice;
+
+    $("#summary").innerHTML =
+      '<div class="s-sec"><div><div class="s-title">' + esc(name) + '</div><div class="s-meta">' + esc(s.market === "Both" ? "AU and NZ" : s.market) + " · " + esc(s.sector) + " · " + Number(s.students).toLocaleString("en-AU") + " students · " + r.sel.length + " systems</div></div>" +
+      '<div class="price-card main"><span class="lab">One-off build, ex GST</span><span class="price">' + money(r.ex.net) + "</span>" +
+      '<div class="range"><div class="bar"><i style="left:0;right:0"></i><b style="left:' + pos + '%"></b></div><div class="bar-l"><span>' + money(r.lo.net) + "</span><span>" + money(r.hi.net) + "</span></div></div>" +
+      '<span class="s-meta">' + money(r.ex.inc) + " inc GST · " + hrs(r.ex.hours) + " h · " + (r.ex.hours / c.hoursPerDay).toFixed(1) + " days</span></div>" +
+      '<div class="price-card"><span class="lab">Annual licence, ex GST</span><span class="price">' + money(r.ex.licPrice) + "</span>" +
+      '<div class="range"><div class="bar"><i style="left:0;right:0"></i><b style="left:' + lpos + '%"></b></div><div class="bar-l"><span>' + money(r.lo.licPrice) + "</span><span>" + money(r.hi.licPrice) + "</span></div></div>" +
+      '<span class="s-meta">' + money(r.ex.licInc) + " inc GST per year</span></div>" +
+      '<table class="t"><tr class="tot"><td>Three-year total, expected</td><td>' + money(threeYr) + "</td></tr></table></div>" +
+
+      '<div class="s-sec"><div class="s-title">Price range</div><table class="t"><tr><th></th><th>Low</th><th>Expected</th><th>High</th></tr>' +
+      "<tr><td>Hours</td><td>" + hrs(r.lo.hours) + "</td><td>" + hrs(r.ex.hours) + "</td><td>" + hrs(r.hi.hours) + "</td></tr>" +
+      "<tr><td>Build, ex GST</td><td>" + money(r.lo.net) + "</td><td>" + money(r.ex.net) + "</td><td>" + money(r.hi.net) + "</td></tr>" +
+      "<tr><td>Build, inc GST</td><td>" + money(r.lo.inc) + "</td><td>" + money(r.ex.inc) + "</td><td>" + money(r.hi.inc) + "</td></tr>" +
+      "<tr><td>Licence, ex GST</td><td>" + money(r.lo.licPrice) + "</td><td>" + money(r.ex.licPrice) + "</td><td>" + money(r.hi.licPrice) + "</td></tr></table></div>" +
+
+      '<div class="s-sec"><div class="s-title">Build economics, expected</div><table class="t">' +
+      "<tr><td>Labour cost (" + money(r.costRate) + "/h)</td><td>" + money(r.ex.labour) + "</td></tr>" +
+      "<tr><td>Third-party costs</td><td>" + money(s.thirdOnce) + "</td></tr>" +
+      "<tr><td>Total cost</td><td>" + money(r.ex.cost) + "</td></tr>" +
+      "<tr><td>Margin at " + s.margin + "%</td><td>" + money(r.ex.price - r.ex.cost) + "</td></tr>" +
+      (num(s.discount) ? "<tr><td>Discount " + s.discount + "%</td><td>−" + money(r.ex.discAmt) + "</td></tr>" : "") +
+      '<tr class="tot"><td>Price ex GST</td><td>' + money(r.ex.net) + "</td></tr>" +
+      "<tr><td>GST " + s.gst + "%</td><td>" + money(r.ex.gst) + "</td></tr>" +
+      "<tr><td>Price inc GST</td><td>" + money(r.ex.inc) + "</td></tr></table></div>" +
+
+      '<div class="s-sec"><div class="s-title">Hours, before range</div><table class="t">' + hoursRows +
+      '<tr class="tot"><td>Expected total</td><td>' + hrs(r.ex.hours) + " h</td></tr></table></div>" +
+
+      '<div class="s-sec"><div class="s-title">Annual licence build-up</div><table class="t">' +
+      "<tr><td>Hosting and platform</td><td>" + money(c.licHosting) + "</td></tr>" +
+      "<tr><td>Per student (" + Number(s.students).toLocaleString("en-AU") + ")</td><td>" + money(s.students * c.licPerStudent) + "</td></tr>" +
+      "<tr><td>Integration upkeep</td><td>" + money(r.maint) + "</td></tr>" +
+      "<tr><td>Other sources</td><td>" + money((num(s.otherDbs) + num(s.flatFiles)) * c.licPerOther) + "</td></tr>" +
+      "<tr><td>Third-party annual</td><td>" + money(s.thirdAnnual) + "</td></tr>" +
+      "<tr><td>Risk uplift</td><td>" + money(r.ex.lic - r.licVar - num(s.thirdAnnual)) + "</td></tr>" +
+      "<tr><td>Cost</td><td>" + money(r.ex.lic) + "</td></tr>" +
+      '<tr class="tot"><td>Price at ' + s.licMargin + "% margin</td><td>" + money(r.ex.licPrice) + "</td></tr></table></div>" +
+
+      (watch.length ? '<div class="s-sec"><div class="s-title">Watch-outs</div><div class="watch">' + watch.join("") + "</div></div>" : "") +
+
+      '<div class="s-sec"><div class="btnrow"><button type="button" class="btn primary" id="copyBtn">Copy summary</button><button type="button" class="btn" id="printBtn">Print</button></div><div class="toast" id="toast"></div></div>';
+
+    lastText = [
+      "School OS estimate: " + name,
+      (s.market === "Both" ? "AU and NZ" : s.market) + ", " + s.sector + ", " + s.students + " students, " + s.staff + " staff, " + s.campuses + " campus(es)",
+      "Systems: " + (r.sel.length ? r.sel.map(function (x) { return x.n + " (" + TIERS[x.t] + ", " + x.h + "h)"; }).join("; ") : "none"),
+      "Other sources: " + s.otherDbs + " databases, " + s.flatFiles + " files. Data quality: " + ["Clean", "Moderate", "Dirty", "Very dirty"][s.dq] + ". Risk " + s.risk + " (" + riskLabel(s.risk) + ")",
+      "",
+      "Build (ex GST): low " + money(r.lo.net) + ", expected " + money(r.ex.net) + ", high " + money(r.hi.net),
+      "Build (inc GST): " + money(r.lo.inc) + " / " + money(r.ex.inc) + " / " + money(r.hi.inc),
+      "Hours: " + hrs(r.lo.hours) + " / " + hrs(r.ex.hours) + " / " + hrs(r.hi.hours),
+      "Annual licence (ex GST): " + money(r.lo.licPrice) + " / " + money(r.ex.licPrice) + " / " + money(r.hi.licPrice),
+      "Three-year total, expected: " + money(threeYr),
+      "Rates: " + money(s.rate) + "/day cost, " + s.margin + "% build margin, " + s.licMargin + "% licence margin"
+    ].join("\n");
+
+    $("#copyBtn").addEventListener("click", copySummary);
+    $("#printBtn").addEventListener("click", function () { try { window.print(); } catch (e) { toast("Printing is not available here."); } });
+    save();
+  }
+
+  function toast(t) { var el = $("#toast"); if (el) el.textContent = t; }
+  function copySummary() {
+    var done = function () { toast("Summary copied."); };
+    var fallback = function () {
+      var ta = document.createElement("textarea"); ta.value = lastText; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { toast("Copy was blocked. Select the figures and copy them manually."); }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(lastText).then(done, fallback);
+    else fallback();
+  }
+
+  /* ---------- Wiring ---------- */
+  $$("#marketSeg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      state.market = b.getAttribute("data-m");
+      if (state.market === "AU") state.gst = 10;
+      if (state.market === "NZ") state.gst = 15;
+      $("#f-gst").value = state.gst;
+      renderSystems(); update();
+    });
+  });
+  $("#clearSys").addEventListener("click", function () {
+    Object.keys(state.sys).forEach(function (k) { state.sys[k].on = false; });
+    state.custom.forEach(function (c) { c.on = false; });
+    renderSystems(); renderCustom(); update();
+  });
+  $("#addCustom").addEventListener("click", function () {
+    state.custom.push({ n: "", on: false, t: 1, h: 40 });
+    renderCustom(); update();
+  });
+  $("#applySuggest").addEventListener("click", function () {
+    state.risk = calc().sugg; $("#f-risk").value = state.risk; update();
+  });
+  $("#resetBtn").addEventListener("click", function () {
+    state = defaults(); renderAll(); update();
+  });
+
+  // Section nav highlight
+  var links = $$("#subnav a");
+  function onScroll() {
+    var y = window.scrollY + 160, cur = links[0];
+    links.forEach(function (a) {
+      var t = document.getElementById(a.getAttribute("href").slice(1));
+      if (t && t.offsetTop <= y) cur = a;
+    });
+    links.forEach(function (a) { a.classList.toggle("on", a === cur); });
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  links.forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      var t = document.getElementById(a.getAttribute("href").slice(1));
+      if (!t) return;
+      e.preventDefault();
+      if (t.tagName === "DETAILS") t.open = true;
+      t.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  var GENERATED = "#sysList, #customList, #modList, #assumpBody";
+
+  // Static fields are bound once; Reset only refreshes their values.
+  function renderAll() {
+    $$(".form-col [data-bind]").forEach(function (el) {
+      if (el.closest(GENERATED)) return;
+      var v = getPath(state, el.getAttribute("data-bind"));
+      if (el.type === "checkbox") el.checked = !!v; else el.value = v;
+    });
+    renderSystems(); renderCustom(); renderMods(); renderAssump();
+  }
+
+  (function init() {
+    $$(".form-col [data-bind]").forEach(function (el) {
+      if (el.closest(GENERATED)) return;
+      var path = el.getAttribute("data-bind");
+      el.addEventListener("input", function () { onInput(el, path); });
+      el.addEventListener("change", function () { onInput(el, path); });
+    });
+    renderAll();
+    update(); onScroll();
+  })();
+})();
+</script>
+</body>
+</html>
